@@ -20,6 +20,7 @@ export default function AdminPage() {
   const [success, setSuccess] = useState('');
   const [selectedQR, setSelectedQR] = useState<Employee | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   useEffect(() => { fetchEmployees(); }, []);
 
@@ -36,7 +37,7 @@ export default function AdminPage() {
   async function handleAddEmployee(e: React.FormEvent) {
     e.preventDefault();
     setError(''); setSuccess('');
-    if (!name.trim() || !nic.trim()) { setError('Name aur NIC required hain'); return; }
+    if (!name.trim() || !nic.trim()) { setError('Name aur NIC dono required hain'); return; }
     setLoading(true);
     try {
       const res = await fetch('/api/employees', {
@@ -46,11 +47,11 @@ export default function AdminPage() {
       });
       const data = await res.json();
       if (data.success) {
-        setSuccess(`${name} ka QR Code generate ho gaya!`);
+        setSuccess(`${name} add ho gaya!`);
         setName(''); setNic('');
         setSelectedQR(data.employee);
         fetchEmployees();
-      } else { setError(data.message || 'Error aya'); }
+      } else { setError(data.message || 'Kuch error aya'); }
     } catch { setError('Server se connect nahi ho saka'); }
     finally { setLoading(false); }
   }
@@ -74,105 +75,284 @@ export default function AdminPage() {
   function printQR(emp: Employee) {
     const win = window.open('', '_blank');
     if (!win) return;
-    win.document.write(`<html><head><title>QR - ${emp.name}</title><style>body{font-family:'Segoe UI',sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#fff}.card{text-align:center;border:2px solid #e2e8f0;border-radius:16px;padding:32px;max-width:320px}h2{font-size:22px;margin:16px 0 4px;color:#0f172a}p{color:#64748b;font-size:13px;margin:0}img{border-radius:12px}.badge{background:#f1f5f9;border-radius:8px;padding:8px 16px;margin-top:12px;display:inline-block;font-size:12px;color:#475569;font-weight:600;letter-spacing:1px}</style></head><body><div class="card"><div style="font-size:40px">🏢</div><img src="${emp.qrCode}" width="200" height="200"/><h2>${emp.name}</h2><p>NIC: ${emp.nic}</p><div class="badge">SCAN FOR ATTENDANCE</div></div></body></html>`);
+    win.document.write(`<!DOCTYPE html><html><head><title>QR — ${emp.name}</title>
+    <style>
+      *{margin:0;padding:0;box-sizing:border-box}
+      body{font-family:'DM Sans',system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#F7F6F3}
+      .card{background:white;border-radius:20px;padding:36px 32px;text-align:center;max-width:300px;border:1px solid #e5e3de;box-shadow:0 8px 32px rgba(0,0,0,0.08)}
+      .qr-wrap{background:white;border-radius:12px;padding:12px;display:inline-block;border:1px solid #e5e3de;margin-bottom:20px}
+      h2{font-size:20px;font-weight:600;color:#0F0E0C;margin-bottom:4px;letter-spacing:-0.3px}
+      .nic{font-size:13px;color:#6B6760;font-family:'DM Mono',monospace;margin-bottom:16px}
+      .badge{display:inline-block;background:#EAE8FA;color:#4A3F9F;font-size:11px;font-weight:600;padding:5px 14px;border-radius:99px;letter-spacing:0.5px}
+      @media print{body{background:white}.card{box-shadow:none;border:none}}
+    </style></head>
+    <body>
+      <div class="card">
+        <div class="qr-wrap"><img src="${emp.qrCode}" width="200" height="200" /></div>
+        <h2>${emp.name}</h2>
+        <p class="nic">NIC: ${emp.nic}</p>
+        <span class="badge">SCAN FOR ATTENDANCE</span>
+      </div>
+      <script>window.onload=()=>{window.print();}<\/script>
+    </body></html>`);
     win.document.close();
-    win.print();
   }
 
+  const filtered = employees.filter(e =>
+    e.name.toLowerCase().includes(search.toLowerCase()) ||
+    e.nic.includes(search)
+  );
+
   return (
-    <div className="grid-bg" style={{ minHeight: '100vh', padding: '24px' }}>
-      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50 }}>
-        <div className="glass" style={{ padding: '16px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'linear-gradient(135deg, #00d4ff, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>🛡️</div>
-            <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '18px' }}>Admin Panel</span>
-          </div>
-          <Link href="/" style={{ textDecoration: 'none', color: '#64748b', fontSize: '14px' }}>← Back</Link>
+    <div className="page" style={{ background: 'var(--bg)' }}>
+
+      {/* ── Topbar ── */}
+      <nav className="topbar">
+        <div className="topbar-logomark" style={{ textDecoration: 'none' }}>
+          <svg viewBox="0 0 18 18" fill="none">
+            <rect x="2" y="2" width="6" height="6" rx="1.5" fill="rgba(255,255,255,0.5)" />
+            <rect x="10" y="2" width="6" height="6" rx="1.5" fill="white" />
+            <rect x="2" y="10" width="6" height="6" rx="1.5" fill="white" />
+            <rect x="10" y="10" width="6" height="6" rx="1.5" fill="rgba(255,255,255,0.5)" />
+          </svg>
         </div>
-      </div>
+        <span className="topbar-name" style={{ marginLeft: 10 }}>Attend<em>X</em></span>
+        <div style={{
+          marginLeft: 10, fontSize: 11, fontWeight: 600, color: 'var(--purple)',
+          background: 'var(--purple-light)', padding: '3px 10px', borderRadius: 99,
+          letterSpacing: '0.3px'
+        }}>ADMIN</div>
+        <div className="topbar-spacer" />
+        <Link href="/attendance" className="topbar-back" style={{ marginRight: 8 }}>
+          📊 Records
+        </Link>
+        <Link href="/" className="topbar-back">← Back</Link>
+      </nav>
 
-      <div style={{ maxWidth: '1200px', margin: '0 auto', paddingTop: '80px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(340px, 400px) 1fr', gap: '24px', alignItems: 'start' }}>
+      <div className="container" style={{ paddingTop: 32, paddingBottom: 48 }}>
 
-          {/* Form + QR Preview */}
-          <div>
-            <div className="card fade-in" style={{ marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '20px' }}>➕ Naya Employee</h2>
+        {/* Page title */}
+        <div className="fade-up" style={{ marginBottom: 28 }}>
+          <h1 style={{ fontSize: 26, fontWeight: 600, letterSpacing: '-0.5px', marginBottom: 4 }}>
+            Employee Management
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
+            Add employees, generate QR codes, and manage your workforce.
+          </p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 360px) 1fr', gap: 24, alignItems: 'start' }}>
+
+          {/* ── Left Column ── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+            {/* Add Employee Form */}
+            <div className="card fade-up fade-up-1">
+              <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ width: 28, height: 28, background: 'var(--purple-light)', borderRadius: 6, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>+</span>
+                Add New Employee
+              </h2>
+
               <form onSubmit={handleAddEmployee}>
-                <div style={{ marginBottom: '14px' }}>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#64748b', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Employee Name</label>
-                  <input className="input" placeholder="e.g. Ahmed Ali" value={name} onChange={e => setName(e.target.value)} />
+                <div style={{ marginBottom: 14 }}>
+                  <label className="label">Employee Name</label>
+                  <input
+                    className="input"
+                    placeholder="e.g. Ahmed Ali"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                  />
                 </div>
-                <div style={{ marginBottom: '20px' }}>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#64748b', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>NIC Number</label>
-                  <input className="input" placeholder="e.g. 42201-1234567-1" value={nic} onChange={e => setNic(e.target.value)} />
+                <div style={{ marginBottom: 18 }}>
+                  <label className="label">NIC Number</label>
+                  <input
+                    className="input"
+                    placeholder="e.g. 42201-1234567-1"
+                    value={nic}
+                    onChange={e => setNic(e.target.value)}
+                    style={{ fontFamily: 'var(--mono)' }}
+                  />
                 </div>
-                {error && <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '10px', padding: '12px', marginBottom: '14px', color: '#ef4444', fontSize: '13px' }}>⚠️ {error}</div>}
-                {success && <div style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '10px', padding: '12px', marginBottom: '14px', color: '#10b981', fontSize: '13px' }}>✅ {success}</div>}
-                <button type="submit" className="btn-primary" disabled={loading} style={{ width: '100%' }}>
-                  {loading ? '⏳ Generating...' : '🔲 Generate QR Code'}
+
+                {error && (
+                  <div className="alert alert-error" style={{ marginBottom: 14 }}>
+                    <span>⚠</span> {error}
+                  </div>
+                )}
+                {success && (
+                  <div className="alert alert-success" style={{ marginBottom: 14 }}>
+                    <span>✓</span> {success}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  className="btn btn-primary btn-full"
+                  disabled={loading}
+                  style={{ fontSize: 14, padding: '11px 20px' }}
+                >
+                  {loading ? (
+                    <><span className="spin">◌</span> Generating QR...</>
+                  ) : (
+                    <>Generate QR Code</>
+                  )}
                 </button>
               </form>
             </div>
 
+            {/* QR Preview */}
             {selectedQR && (
-              <div className="card fade-in" style={{ borderColor: 'rgba(0,212,255,0.3)' }}>
-                <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '16px', color: '#00d4ff' }}>🔲 QR Code Preview</h3>
+              <div className="card fade-up" style={{ borderColor: 'rgba(74,63,159,0.25)', borderWidth: 1.5 }}>
+                <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 16, color: 'var(--purple)' }}>
+                  QR Code Preview
+                </h3>
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ background: 'white', borderRadius: '12px', padding: '12px', display: 'inline-block', marginBottom: '12px' }}>
-                    <img src={selectedQR.qrCode} alt="QR" style={{ width: '180px', height: '180px', display: 'block' }} />
+                  <div className="qr-wrap" style={{ marginBottom: 14 }}>
+                    <img
+                      src={selectedQR.qrCode}
+                      alt="QR Code"
+                      style={{ width: 168, height: 168, display: 'block' }}
+                    />
                   </div>
-                  <p style={{ fontWeight: 600, fontSize: '16px', marginBottom: '2px' }}>{selectedQR.name}</p>
-                  <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '16px' }}>{selectedQR.nic}</p>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                    <button onClick={() => downloadQR(selectedQR)} style={{ background: 'rgba(0,212,255,0.1)', border: '1px solid rgba(0,212,255,0.3)', color: '#00d4ff', borderRadius: '8px', padding: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>⬇️ Download</button>
-                    <button onClick={() => printQR(selectedQR)} style={{ background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.3)', color: '#a78bfa', borderRadius: '8px', padding: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>🖨️ Print</button>
+                  <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 2 }}>{selectedQR.name}</p>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: 12, fontFamily: 'var(--mono)', marginBottom: 18 }}>
+                    {selectedQR.nic}
+                  </p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => downloadQR(selectedQR)}
+                    >
+                      ↓ Download
+                    </button>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => printQR(selectedQR)}
+                    >
+                      ⎙ Print
+                    </button>
                   </div>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Employee List */}
-          <div className="card fade-in">
-            <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '20px' }}>👥 Employees ({employees.length})</h2>
-            {fetchLoading ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>⏳ Loading...</div>
-            ) : employees.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                <div style={{ fontSize: '48px', marginBottom: '12px' }}>👤</div>
-                <p>Koi employee nahi. Pehle employee add karo.</p>
+          {/* ── Right Column: Employee List ── */}
+          <div className="fade-up fade-up-2">
+            {/* Header + Search */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 12 }}>
+              <h2 style={{ fontSize: 16, fontWeight: 600 }}>
+                Employees
+                <span style={{
+                  marginLeft: 8, background: 'var(--surface-2)', color: 'var(--text-secondary)',
+                  fontSize: 12, fontWeight: 500, padding: '2px 10px', borderRadius: 99,
+                  border: '1px solid var(--border)'
+                }}>{employees.length}</span>
+              </h2>
+              <div style={{ position: 'relative' }}>
+                <input
+                  className="input"
+                  placeholder="Search name or NIC..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  style={{ width: 220, paddingLeft: 32, fontSize: 13 }}
+                />
+                <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)', fontSize: 13 }}>⌕</span>
               </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {employees.map(emp => (
-                  <div key={emp._id} style={{ background: 'rgba(26,34,53,0.8)', border: '1px solid #1e2d45', borderRadius: '12px', padding: '16px', display: 'flex', alignItems: 'center', gap: '16px', transition: 'border-color 0.2s' }}
-                    onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(0,212,255,0.3)')}
-                    onMouseLeave={e => (e.currentTarget.style.borderColor = '#1e2d45')}>
-                    <div style={{ background: 'white', borderRadius: '8px', padding: '4px', flexShrink: 0 }}>
-                      <img src={emp.qrCode} alt="QR" style={{ width: '52px', height: '52px', display: 'block' }} />
+            </div>
+
+            <div className="card-flush">
+              {fetchLoading ? (
+                <div className="empty-state">
+                  <div style={{ fontSize: 24, marginBottom: 12, opacity: 0.3 }}>◌</div>
+                  <p style={{ color: 'var(--text-tertiary)', fontSize: 14 }}>Loading employees...</p>
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="empty-state">
+                  <div className="empty-icon">👤</div>
+                  <div className="empty-title">{search ? 'No results found' : 'No employees yet'}</div>
+                  <div className="empty-desc">{search ? 'Try a different name or NIC' : 'Add your first employee using the form.'}</div>
+                </div>
+              ) : (
+                <div>
+                  {filtered.map((emp, i) => (
+                    <div
+                      key={emp._id}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 14,
+                        padding: '14px 20px',
+                        borderBottom: i < filtered.length - 1 ? '1px solid var(--border)' : 'none',
+                        transition: 'background 0.12s',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--bg)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      {/* QR thumbnail */}
+                      <div style={{ background: 'white', borderRadius: 8, padding: 4, border: '1px solid var(--border)', flexShrink: 0 }}>
+                        <img src={emp.qrCode} alt="" style={{ width: 44, height: 44, display: 'block' }} />
+                      </div>
+
+                      {/* Info */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 2, color: 'var(--text-primary)' }}>
+                          {emp.name}
+                        </div>
+                        <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
+                          {emp.nic}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
+                          Added {new Date(emp.createdAt).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => setSelectedQR(emp)}
+                          title="View QR"
+                        >
+                          View QR
+                        </button>
+                        <button
+                          className="btn btn-ghost btn-sm btn-icon"
+                          onClick={() => downloadQR(emp)}
+                          title="Download"
+                        >
+                          ↓
+                        </button>
+                        {deleteConfirm === emp._id ? (
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            <button
+                              className="btn btn-danger btn-sm"
+                              onClick={() => handleDelete(emp._id)}
+                              style={{ fontSize: 12 }}
+                            >
+                              Confirm
+                            </button>
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              onClick={() => setDeleteConfirm(null)}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            className="btn btn-ghost btn-sm btn-icon"
+                            onClick={() => setDeleteConfirm(emp._id)}
+                            style={{ color: 'var(--red)' }}
+                            title="Delete"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontWeight: 600, fontSize: '15px', marginBottom: '2px' }}>{emp.name}</p>
-                      <p style={{ color: '#64748b', fontSize: '12px', marginBottom: '4px' }}>🪪 {emp.nic}</p>
-                      <p style={{ color: '#475569', fontSize: '11px' }}>{new Date(emp.createdAt).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                    </div>
-                    <div style={{ display: 'flex', gap: '6px', flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                      <button onClick={() => setSelectedQR(emp)} style={{ background: 'rgba(0,212,255,0.1)', border: '1px solid rgba(0,212,255,0.2)', color: '#00d4ff', borderRadius: '8px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px' }}>View QR</button>
-                      <button onClick={() => downloadQR(emp)} style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', color: '#10b981', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer', fontSize: '12px' }}>⬇️</button>
-                      {deleteConfirm === emp._id ? (
-                        <>
-                          <button onClick={() => handleDelete(emp._id)} style={{ background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.4)', color: '#ef4444', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>Sure?</button>
-                          <button onClick={() => setDeleteConfirm(null)} style={{ background: 'rgba(100,116,139,0.1)', border: '1px solid #1e2d45', color: '#64748b', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer', fontSize: '12px' }}>No</button>
-                        </>
-                      ) : (
-                        <button onClick={() => setDeleteConfirm(emp._id)} style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer', fontSize: '12px' }}>🗑️</button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

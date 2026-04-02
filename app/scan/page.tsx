@@ -15,43 +15,37 @@ export default function ScanPage() {
   const [result, setResult] = useState<ScanResult | null>(null);
   const [processing, setProcessing] = useState(false);
   const scannerRef = useRef<any>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { return () => { stopScanner(); }; }, []);
+  useEffect(() => () => { stopScanner(); }, []);
 
   async function startScanner() {
     setResult(null);
     setScanning(true);
-    // Dynamically import html5-qrcode
     const { Html5Qrcode } = await import('html5-qrcode');
-    const qrScanner = new Html5Qrcode('qr-reader');
-    scannerRef.current = qrScanner;
-
+    const qr = new Html5Qrcode('qr-reader');
+    scannerRef.current = qr;
     try {
-      await qrScanner.start(
+      await qr.start(
         { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        async (decodedText: string) => {
+        { fps: 10, qrbox: { width: 240, height: 240 } },
+        async (text: string) => {
           if (processing) return;
           setProcessing(true);
           await stopScanner();
-          await processQR(decodedText);
+          await processQR(text);
           setProcessing(false);
         },
         undefined
       );
-    } catch (err) {
+    } catch {
       setScanning(false);
-      setResult({ success: false, message: 'Camera access nahi mila. Permission check karo.' });
+      setResult({ success: false, message: 'Camera access denied. Please allow camera permission in your browser settings.' });
     }
   }
 
   async function stopScanner() {
     if (scannerRef.current) {
-      try {
-        await scannerRef.current.stop();
-        scannerRef.current.clear();
-      } catch {}
+      try { await scannerRef.current.stop(); scannerRef.current.clear(); } catch {}
       scannerRef.current = null;
     }
     setScanning(false);
@@ -60,158 +54,137 @@ export default function ScanPage() {
   async function processQR(text: string) {
     try {
       let token = text;
-      // Try parsing JSON (our QR format)
-      try {
-        const parsed = JSON.parse(text);
-        token = parsed.token;
-      } catch {}
-
+      try { const p = JSON.parse(text); token = p.token; } catch {}
       const res = await fetch('/api/scan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token }),
       });
-      const data = await res.json();
-      setResult(data);
+      setResult(await res.json());
     } catch {
-      setResult({ success: false, message: 'Server se connect nahi ho saka.' });
+      setResult({ success: false, message: 'Unable to connect to the server. Please try again.' });
     }
   }
 
-  function reset() {
-    setResult(null);
-    setScanning(false);
-  }
+  const rc = result?.success ? (result.action === 'checkin' ? 'var(--green-text)' : 'var(--purple-text)') : '#FCA5A5';
+  const rbg = result?.success ? (result.action === 'checkin' ? 'var(--green-tint)' : 'var(--purple-tint)') : 'var(--error-bg)';
+  const rbdr = result?.success ? (result.action === 'checkin' ? 'var(--green-bdr)' : 'var(--purple-bdr)') : 'var(--error-bdr)';
 
   return (
-    <div className="grid-bg" style={{ minHeight: '100vh', padding: '24px' }}>
-      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50 }}>
-        <div className="glass" style={{ padding: '16px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'linear-gradient(135deg, #7c3aed, #00d4ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>📷</div>
-            <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '18px' }}>QR Scanner</span>
+    <div className="page">
+      <nav className="topbar">
+        <div className="logo">
+          <div className="logo-mark">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <rect x="2" y="2" width="6" height="6" rx="1.5" fill="rgba(255,255,255,0.5)" />
+              <rect x="10" y="2" width="6" height="6" rx="1.5" fill="white" />
+              <rect x="2" y="10" width="6" height="6" rx="1.5" fill="white" />
+              <rect x="10" y="10" width="6" height="6" rx="1.5" fill="rgba(255,255,255,0.5)" />
+            </svg>
           </div>
-          <Link href="/" style={{ textDecoration: 'none', color: '#64748b', fontSize: '14px' }}>← Back</Link>
+          <span className="logo-name">Attend<em>X</em></span>
         </div>
-      </div>
+        <span className="topbar-chip chip-scan" style={{ marginLeft: 8 }}>QR Scanner</span>
+        <div className="topbar-spacer" />
+        <Link href="/" className="topbar-btn">← Back</Link>
+      </nav>
 
-      <div style={{ maxWidth: '520px', margin: '0 auto', paddingTop: '96px' }}>
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <h1 style={{ fontSize: '32px', fontWeight: 800, marginBottom: '8px' }}>Attendance Scanner</h1>
-          <p style={{ color: '#64748b' }}>QR code scan karke apni attendance lagao</p>
+      <div className="container-sm" style={{ paddingTop: 48, paddingBottom: 60 }}>
+        <div className="fade-up" style={{ textAlign: 'center', marginBottom: 32 }}>
+          <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.7px', marginBottom: 10 }}>QR Scanner</h1>
+          <p style={{ color: 'var(--text-3)', fontSize: 15 }}>Hold your QR card in front of the camera to mark attendance</p>
         </div>
 
-        <div className="card fade-in">
-          {/* Scanner area */}
-          {!result && (
-            <>
-              <div id="qr-reader" ref={containerRef} style={{
-                borderRadius: '12px', overflow: 'hidden',
-                border: scanning ? '2px solid rgba(0,212,255,0.5)' : '2px solid #1e2d45',
-                marginBottom: '20px',
-                display: scanning ? 'block' : 'none',
-                transition: 'border-color 0.3s',
-                minHeight: '300px',
-              }} />
+        <div className="card fade-up fade-up-1" style={{ padding: 28 }}>
 
-              {!scanning && (
-                <div style={{
-                  border: '2px dashed #1e2d45', borderRadius: '12px', padding: '60px 40px',
-                  textAlign: 'center', marginBottom: '20px',
-                  background: 'rgba(26,34,53,0.5)'
-                }}>
-                  <div style={{ fontSize: '64px', marginBottom: '16px' }}>📷</div>
-                  <p style={{ color: '#64748b', marginBottom: '8px' }}>Camera band hai</p>
-                  <p style={{ color: '#475569', fontSize: '13px' }}>Scan shuru karne ke liye button dabao</p>
-                </div>
-              )}
-
-              <button
-                onClick={scanning ? stopScanner : startScanner}
-                className="btn-primary"
-                style={{ width: '100%', fontSize: '16px', padding: '16px' }}
-              >
-                {scanning ? '⏹️ Scan Band Karo' : '▶️ Scan Shuru Karo'}
+          {/* Idle */}
+          {!result && !scanning && (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ border: '2px dashed rgba(255,255,255,0.12)', borderRadius: 'var(--r-xl)', padding: '56px 20px', marginBottom: 24, background: 'rgba(255,255,255,0.02)' }}>
+                <svg width="56" height="56" viewBox="0 0 56 56" fill="none" style={{ display: 'block', margin: '0 auto 14px', opacity: 0.25 }}>
+                  <rect x="4" y="4" width="20" height="20" rx="3" stroke="white" strokeWidth="2.5" />
+                  <rect x="32" y="4" width="20" height="20" rx="3" stroke="white" strokeWidth="2.5" />
+                  <rect x="4" y="32" width="20" height="20" rx="3" stroke="white" strokeWidth="2.5" />
+                  <rect x="36" y="36" width="8" height="8" rx="1.5" fill="white" />
+                  <path d="M36 32v4M32 36h4" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+                </svg>
+                <p style={{ fontSize: 15, color: 'var(--text-2)', marginBottom: 4, fontWeight: 500 }}>Camera is off</p>
+                <p style={{ fontSize: 13, color: 'var(--text-3)' }}>Press the button below to start scanning</p>
+              </div>
+              <button className="btn btn-green btn-full btn-lg" onClick={startScanner}>
+                ▶ Start Scanning
               </button>
+            </div>
+          )}
 
-              {scanning && (
-                <div style={{ textAlign: 'center', marginTop: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#00d4ff', fontSize: '14px' }}>
-                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#00d4ff', animation: 'pulse 1.5s infinite' }} />
-                  QR code camera ke saamne rakhein...
-                </div>
-              )}
-            </>
+          {/* Scanning */}
+          {!result && scanning && (
+            <div>
+              <div id="qr-reader" style={{ borderRadius: 'var(--r-lg)', overflow: 'hidden', border: '2px solid var(--green)', marginBottom: 20, minHeight: 300, boxShadow: '0 0 30px rgba(16,185,129,0.20)' }} />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 20, color: 'var(--green-text)', fontSize: 13 }}>
+                <span className="pulse-anim" style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--green)', display: 'inline-block' }} />
+                Hold your QR card in front of the camera...
+              </div>
+              <button className="btn btn-outline btn-full" onClick={stopScanner}>⏹ Stop Scanning</button>
+            </div>
           )}
 
           {/* Result */}
           {result && (
-            <div className="fade-in" style={{ textAlign: 'center', padding: '20px' }}>
-              <div style={{ fontSize: '72px', marginBottom: '16px' }}>
-                {result.success ? (result.action === 'checkin' ? '✅' : '👋') : '❌'}
+            <div className="fade-in" style={{ textAlign: 'center' }}>
+              <div style={{ width: 76, height: 76, borderRadius: '50%', background: rbg, border: `2px solid ${rbdr}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 22px', fontSize: 30, color: rc, fontWeight: 700, boxShadow: `0 0 30px ${rbg}` }}>
+                {result.success ? (result.action === 'checkin' ? '✓' : '↩') : '✕'}
               </div>
 
-              <div style={{
-                background: result.success ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
-                border: `1px solid ${result.success ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
-                borderRadius: '16px', padding: '24px', marginBottom: '24px'
-              }}>
-                <h2 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '8px', color: result.success ? '#10b981' : '#ef4444' }}>
-                  {result.success ? (result.action === 'checkin' ? 'Check-In Successful!' : 'Check-Out Successful!') : 'Error!'}
-                </h2>
-                <p style={{ color: '#94a3b8', marginBottom: result.employee ? '16px' : '0' }}>{result.message}</p>
+              <div style={{ background: rbg, border: `1px solid ${rbdr}`, borderRadius: 'var(--r-lg)', padding: '22px', marginBottom: 24, textAlign: 'left' }}>
+                <p style={{ fontWeight: 700, fontSize: 18, color: rc, textAlign: 'center', marginBottom: 8 }}>
+                  {result.success ? (result.action === 'checkin' ? 'Check-In Successful!' : 'Check-Out Successful!') : 'Scan Failed'}
+                </p>
+                <p style={{ color: 'var(--text-3)', fontSize: 13, textAlign: 'center', marginBottom: result.employee ? 16 : 0 }}>{result.message}</p>
 
                 {result.employee && (
-                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '10px', padding: '16px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                      <span style={{ color: '#64748b', fontSize: '13px' }}>Name</span>
-                      <span style={{ fontWeight: 600 }}>{result.employee.name}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                      <span style={{ color: '#64748b', fontSize: '13px' }}>NIC</span>
-                      <span style={{ fontWeight: 600 }}>{result.employee.nic}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#64748b', fontSize: '13px' }}>Time</span>
-                      <span style={{ fontWeight: 600, color: '#00d4ff' }}>{result.time}</span>
-                    </div>
+                  <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 'var(--r-md)', border: `1px solid ${rbdr}`, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {[
+                      { l: 'Name', v: result.employee.name },
+                      { l: 'NIC', v: result.employee.nic, mono: true },
+                      { l: 'Time', v: result.time, accent: rc },
+                    ].map(row => (
+                      <div key={row.l} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{row.l}</span>
+                        <span style={{ fontSize: 13, fontWeight: 600, fontFamily: row.mono ? 'var(--mono)' : 'inherit', color: row.accent || 'var(--text-1)' }}>{row.v}</span>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <button onClick={reset} className="btn-primary">
-                  🔄 Dobara Scan
-                </button>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <button className="btn btn-green" onClick={() => setResult(null)} style={{ padding: '12px' }}>↺ Scan Again</button>
                 <Link href="/attendance" style={{ textDecoration: 'none' }}>
-                  <button style={{ width: '100%', background: 'rgba(100,116,139,0.1)', border: '1px solid #1e2d45', color: '#94a3b8', borderRadius: '10px', padding: '12px', cursor: 'pointer', fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: '14px' }}>
-                    📊 Records
-                  </button>
+                  <button className="btn btn-ghost btn-full" style={{ padding: '12px' }}>📊 View Records</button>
                 </Link>
               </div>
             </div>
           )}
         </div>
 
-        {/* Instructions */}
+        {/* Steps */}
         {!result && !scanning && (
-          <div className="card fade-in" style={{ marginTop: '20px', background: 'rgba(17,24,39,0.5)' }}>
-            <h3 style={{ fontSize: '14px', fontWeight: 700, marginBottom: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>📋 Tareeqa</h3>
+          <div className="card fade-up fade-up-2" style={{ marginTop: 16, background: 'rgba(255,255,255,0.02)' }}>
+            <div className="section-label">How it works</div>
             {[
-              ['1️⃣', 'Scan Shuru Karo button dabao'],
-              ['2️⃣', 'Camera permission allow karo'],
-              ['3️⃣', 'Apna QR card camera ke saamne rakhein'],
-              ['4️⃣', 'Check-in/out automatically register ho jaegi'],
-            ].map(([icon, text]) => (
-              <div key={text} style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
-                <span style={{ fontSize: '18px' }}>{icon}</span>
-                <span style={{ color: '#64748b', fontSize: '14px' }}>{text}</span>
+              ['1', 'Press "Start Scanning" button'],
+              ['2', 'Allow camera permission in your browser'],
+              ['3', 'Hold your QR card in front of the camera'],
+              ['4', 'Attendance will be registered automatically'],
+            ].map(([n, t]) => (
+              <div key={n} style={{ display: 'flex', alignItems: 'center', gap: 13, marginBottom: 12 }}>
+                <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--green-tint)', border: '1px solid var(--green-bdr)', color: 'var(--green-text)', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{n}</div>
+                <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{t}</span>
               </div>
             ))}
           </div>
         )}
       </div>
-
-      <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }`}</style>
     </div>
   );
 }

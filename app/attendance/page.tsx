@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
-interface AttendanceRecord {
+interface Record {
   _id: string;
   employeeName: string;
   employeeNic: string;
@@ -13,7 +13,7 @@ interface AttendanceRecord {
 }
 
 export default function AttendancePage() {
-  const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [records, setRecords] = useState<Record[]>([]);
   const [loading, setLoading] = useState(true);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -29,117 +29,100 @@ export default function AttendancePage() {
     finally { setLoading(false); }
   }
 
-  function formatTime(iso: string) {
-    return new Date(iso).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', hour12: true });
+  function fmtTime(iso: string) {
+    return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
   }
 
-  function calcDuration(checkIn: string, checkOut?: string) {
-    if (!checkOut) return '—';
-    const diff = new Date(checkOut).getTime() - new Date(checkIn).getTime();
-    const hrs = Math.floor(diff / 3600000);
-    const mins = Math.floor((diff % 3600000) / 60000);
-    return `${hrs}h ${mins}m`;
+  function dur(ci: string, co?: string) {
+    if (!co) return null;
+    const d = new Date(co).getTime() - new Date(ci).getTime();
+    return `${Math.floor(d / 3600000)}h ${Math.floor((d % 3600000) / 60000)}m`;
   }
-
-  const presentCount = records.filter(r => r.status === 'present').length;
 
   return (
-    <div className="grid-bg" style={{ minHeight: '100vh', padding: '24px' }}>
-      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50 }}>
-        <div className="glass" style={{ padding: '16px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'linear-gradient(135deg, #10b981, #00d4ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>📊</div>
-            <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '18px' }}>Attendance Records</span>
+    <div className="page">
+      <nav className="topbar">
+        <div className="logo">
+          <div className="logo-mark">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <rect x="2" y="2" width="6" height="6" rx="1.5" fill="rgba(255,255,255,0.5)" />
+              <rect x="10" y="2" width="6" height="6" rx="1.5" fill="white" />
+              <rect x="2" y="10" width="6" height="6" rx="1.5" fill="white" />
+              <rect x="10" y="10" width="6" height="6" rx="1.5" fill="rgba(255,255,255,0.5)" />
+            </svg>
           </div>
-          <Link href="/" style={{ textDecoration: 'none', color: '#64748b', fontSize: '14px' }}>← Back</Link>
+          <span className="logo-name">Attend<em>X</em></span>
         </div>
-      </div>
+        <span className="topbar-chip chip-record" style={{ marginLeft: 8 }}>Records</span>
+        <div className="topbar-spacer" />
+        <Link href="/scan" className="topbar-btn" style={{ marginRight: 8 }}>📷 Scan</Link>
+        <Link href="/" className="topbar-btn">← Back</Link>
+      </nav>
 
-      <div style={{ maxWidth: '1000px', margin: '0 auto', paddingTop: '80px' }}>
-        {/* Stats Row */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
+      <div className="container-md" style={{ paddingTop: 36, paddingBottom: 60 }}>
+
+        <div className="fade-up" style={{ marginBottom: 24 }}>
+          <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.7px', marginBottom: 4 }}>Attendance Records</h1>
+          <p style={{ fontSize: 14, color: 'var(--text-3)' }}>
+            {new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+          </p>
+        </div>
+
+        {/* Stats */}
+        <div className="fade-up fade-up-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 20 }}>
           {[
-            { label: 'Total Records', value: records.length, color: '#00d4ff', icon: '📋' },
-            { label: 'Present', value: presentCount, color: '#10b981', icon: '✅' },
-            { label: 'Checked Out', value: records.filter(r => r.checkOut).length, color: '#a78bfa', icon: '👋' },
+            { l: 'Total Records', v: records.length, c: 'var(--purple-text)', g: 'rgba(139,92,246,0.10)' },
+            { l: 'Present', v: records.filter(r => r.status === 'present').length, c: 'var(--green-text)', g: 'rgba(16,185,129,0.08)' },
+            { l: 'Still Inside', v: records.filter(r => !r.checkOut).length, c: 'var(--amber-text)', g: 'rgba(245,158,11,0.08)' },
           ].map(s => (
-            <div key={s.label} className="card fade-in" style={{ textAlign: 'center', borderColor: `${s.color}22` }}>
-              <div style={{ fontSize: '28px', marginBottom: '8px' }}>{s.icon}</div>
-              <div style={{ fontSize: '32px', fontWeight: 800, color: s.color, fontFamily: 'Syne, sans-serif' }}>{s.value}</div>
-              <div style={{ color: '#64748b', fontSize: '13px' }}>{s.label}</div>
+            <div key={s.l} className="stat" style={{ boxShadow: `0 0 24px ${s.g}` }}>
+              <div className="stat-val" style={{ color: s.c }}>{s.v}</div>
+              <div className="stat-lbl">{s.l}</div>
             </div>
           ))}
         </div>
 
-        {/* Date Filter */}
-        <div className="card fade-in" style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-          <label style={{ color: '#64748b', fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>📅 Date Filter:</label>
-          <input
-            type="date"
-            className="input"
-            value={date}
-            onChange={e => setDate(e.target.value)}
-            style={{ maxWidth: '200px' }}
-          />
-          <button onClick={() => setDate(new Date().toISOString().split('T')[0])} style={{ background: 'rgba(0,212,255,0.1)', border: '1px solid rgba(0,212,255,0.3)', color: '#00d4ff', borderRadius: '8px', padding: '8px 16px', cursor: 'pointer', fontSize: '13px', whiteSpace: 'nowrap' }}>
-            Today
-          </button>
-          <button onClick={fetchRecords} style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', color: '#10b981', borderRadius: '8px', padding: '8px 16px', cursor: 'pointer', fontSize: '13px' }}>
-            🔄 Refresh
-          </button>
+        {/* Date filter */}
+        <div className="card fade-up fade-up-2" style={{ marginBottom: 18, padding: '14px 20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <input type="date" className="input" value={date} onChange={e => setDate(e.target.value)} style={{ maxWidth: 170 }} />
+            <button className="btn btn-ghost btn-sm" onClick={() => setDate(new Date().toISOString().split('T')[0])}>Today</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => { const d = new Date(); d.setDate(d.getDate() - 1); setDate(d.toISOString().split('T')[0]); }}>Yesterday</button>
+            <div style={{ flex: 1 }} />
+            <button className="btn btn-ghost btn-sm" onClick={fetchRecords}>↺ Refresh</button>
+          </div>
         </div>
 
         {/* Table */}
-        <div className="card fade-in" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ padding: '20px 24px', borderBottom: '1px solid #1e2d45', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h2 style={{ fontSize: '18px', fontWeight: 700 }}>
-              Records — {new Date(date + 'T00:00:00').toLocaleDateString('en-PK', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-            </h2>
-            <span className="badge-success">{presentCount} Present</span>
-          </div>
-
+        <div className="card-flush fade-up fade-up-3">
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '60px', color: '#64748b' }}>⏳ Loading...</div>
+            <div className="empty">
+              <div style={{ width: 28, height: 28, border: '3px solid rgba(139,92,246,0.2)', borderTopColor: 'var(--purple)', borderRadius: '50%', animation: 'spin 0.75s linear infinite', margin: '0 auto 12px' }} />
+            </div>
           ) : records.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '60px', color: '#64748b' }}>
-              <div style={{ fontSize: '48px', marginBottom: '12px' }}>📭</div>
-              <p>Is din ka koi record nahi mila</p>
+            <div className="empty">
+              <div className="empty-icon">📭</div>
+              <div className="empty-title">No records for this date</div>
+              <div className="empty-desc">Scan your QR code to register attendance.</div>
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <table className="table">
                 <thead>
-                  <tr style={{ background: 'rgba(26,34,53,0.8)' }}>
-                    {['#', 'Employee', 'NIC', 'Check In', 'Check Out', 'Duration', 'Status'].map(h => (
-                      <th key={h} style={{ padding: '14px 20px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>{h}</th>
-                    ))}
-                  </tr>
+                  <tr>{['#', 'Employee', 'Check In', 'Check Out', 'Duration', 'Status'].map(h => <th key={h}>{h}</th>)}</tr>
                 </thead>
                 <tbody>
-                  {records.map((rec, i) => (
-                    <tr key={rec._id} style={{ borderTop: '1px solid #1e2d45', transition: 'background 0.15s' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,212,255,0.03)')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                      <td style={{ padding: '16px 20px', color: '#475569', fontSize: '13px' }}>{i + 1}</td>
-                      <td style={{ padding: '16px 20px' }}>
-                        <div style={{ fontWeight: 600, fontSize: '14px' }}>{rec.employeeName}</div>
+                  {records.map((r, i) => (
+                    <tr key={r._id}>
+                      <td style={{ color: 'var(--text-3)', fontSize: 12 }}>{i + 1}</td>
+                      <td>
+                        <div style={{ fontWeight: 600, fontSize: 14 }}>{r.employeeName}</div>
+                        <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>{r.employeeNic}</div>
                       </td>
-                      <td style={{ padding: '16px 20px', color: '#64748b', fontSize: '13px', fontFamily: 'monospace' }}>{rec.employeeNic}</td>
-                      <td style={{ padding: '16px 20px' }}>
-                        <span style={{ color: '#10b981', fontWeight: 600, fontSize: '14px' }}>{formatTime(rec.checkIn)}</span>
-                      </td>
-                      <td style={{ padding: '16px 20px' }}>
-                        {rec.checkOut
-                          ? <span style={{ color: '#a78bfa', fontWeight: 600, fontSize: '14px' }}>{formatTime(rec.checkOut)}</span>
-                          : <span style={{ color: '#f59e0b', fontSize: '13px' }}>Still In</span>
-                        }
-                      </td>
-                      <td style={{ padding: '16px 20px', color: '#94a3b8', fontSize: '13px' }}>{calcDuration(rec.checkIn, rec.checkOut)}</td>
-                      <td style={{ padding: '16px 20px' }}>
-                        <span className={rec.checkOut ? 'badge-success' : 'badge-warning'}>
-                          {rec.checkOut ? 'Complete' : 'Checked In'}
-                        </span>
-                      </td>
+                      <td><span style={{ color: 'var(--green-text)', fontWeight: 600 }}>{fmtTime(r.checkIn)}</span></td>
+                      <td>{r.checkOut ? <span style={{ color: '#93C5FD', fontWeight: 600 }}>{fmtTime(r.checkOut)}</span> : <span className="badge badge-amber">Active</span>}</td>
+                      <td>{dur(r.checkIn, r.checkOut) ? <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-2)' }}>{dur(r.checkIn, r.checkOut)}</span> : <span style={{ color: 'var(--text-3)' }}>—</span>}</td>
+                      <td>{r.checkOut ? <span className="badge badge-green">Complete</span> : <span className="badge badge-amber">Active</span>}</td>
                     </tr>
                   ))}
                 </tbody>
